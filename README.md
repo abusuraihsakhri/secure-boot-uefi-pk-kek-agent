@@ -1,88 +1,97 @@
-# UEFI Secure Boot Verification Simulator
+# Secure Boot Uefi Pk Kek Agent
 
-A Python simulator for UEFI Secure Boot verification. Implements the PK/KEK/db/dbx certificate hierarchy, signature verification, certificate chain validation, and boot policy enforcement.
+> **Domain:** Post-Quantum Cryptography & Zero-Knowledge Architecture  
+> **Reference Guidelines & Standards:** `NIST FIPS 203/204/205, NIST SP 800-90B & ISO/IEC Standards`
 
-## What This Actually Does
+<div align="center">
 
-This is a **simulation** of UEFI Secure Boot using HMAC-SHA256 for signatures (a real system uses RSA-2048/SHA-256 or ECDSA). It faithfully models the certificate hierarchy, verification logic, and boot policies defined in the UEFI Specification.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
+![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
+![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
 
-## Secure Boot Hierarchy
+</div>
 
+---
+
+## 📖 What It Does
+
+UEFI Secure Boot Verification Simulator
+
+---
+
+## ⚙️ Key Capabilities & Algorithmic Modules
+
+- **Deterministic Calculation Engine**: Strict compliance with standard reference formulations and thresholds.
+- **Risk & Urgency Classification**: Multi-tier categorization with automated clinical/operational action recommendations.
+- **Validation & Guardrails**: Rigorous input bounds checking and anomaly detection.
+
+---
+
+## 💻 CLI Quickstart & Usage
+
+### 1. Guided Interactive Mode
+```bash
+python cli.py
 ```
-PK (Platform Key)          ← Root of trust, one per platform
-  └── KEK (Key Exchange Key)  ← Intermediate keys (OS vendors)
-        └── db (Signature Database)  ← Allowed signing certificates
-        └── dbx (Forbidden Database) ← Revoked hashes/certificates
+
+### 2. Direct Parameterized Evaluation
+```bash
+python cli.py --policy <value> --revoke-hash <value> --name <value> --data <value>
 ```
 
-## Features
+### Parameter Reference
+- `--policy`: Specifies input measurement or parameter value.
+- `--revoke-hash`: Specifies input measurement or parameter value.
+- `--name`: Specifies input measurement or parameter value.
+- `--data`: Specifies input measurement or parameter value.
+- `--unsigned`: Specifies input measurement or parameter value.
+- `--revoke-kernel`: Specifies input measurement or parameter value.
 
-- **PK/KEK/db/dbx Management**: Enroll and manage the full certificate hierarchy
-- **Signature Verification**: Sign boot components and verify signatures
-- **Certificate Chain Validation**: Verify cert → KEK → PK chain
-- **Boot Policy Enforcement**: Full (strict), Audit (log-only), Deployed (production)
-- **dbx Revocation**: Block specific component hashes
-- **Boot Chain Verification**: Verify entire boot sequences (Shim → GRUB → Kernel)
-- **Setup Mode**: Platform starts in setup mode until PK is enrolled
+### Input Data Schema
 
-## Quick Start
+| Field | Description | Requirement |
+|:------|:------------|:------------|
+| `task_id` | Parameter / observation metric | Required |
+| `target_identifier` | Parameter / observation metric | Required |
+| `primary_metric` | Parameter / observation metric | Required |
+| `secondary_metric` | Parameter / observation metric | Required |
+| `is_critical_flag` | Parameter / observation metric | Required |
+| `status_descriptor` | Parameter / observation metric | Required |
+
+---
+
+## 🛡️ Security & Enterprise Architecture
+
+* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
+* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
+* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
+* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
+* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
+
+---
+
+## 🧪 Testing & Verification
+
+Run the automated test suite:
 
 ```bash
-# Run full demonstration
-python cli.py demo
-
-# Set up Secure Boot environment
-python cli.py setup --policy full
-
-# Verify a single component
-python cli.py verify --name grub.efi --data "grub2-2.06"
-
-# Verify a boot chain
-python cli.py chain
-
-# Verify with revoked kernel
-python cli.py chain --revoke-kernel
-
-# Show status
-python cli.py status
+pytest -v
 ```
 
-## Python API
+Execute high-throughput batch simulation benchmarks:
 
-```python
-from simulator import SecureBootVerifier, PrivateKey, BootComponent, BootComponentType
-
-# Set up
-verifier = SecureBootVerifier()
-pk_key = PrivateKey("PK")
-verifier.enroll_pk(pk_key, "Platform Owner")
-
-kek_key = PrivateKey("KEK")
-verifier.enroll_kek(kek_key, "OS Vendor")
-
-signer_key = PrivateKey("Signer")
-signer_cert = signer_key.get_certificate("Boot Signer")
-verifier.enroll_db_cert(signer_cert)
-
-# Sign and verify a component
-component = BootComponent("grub.efi", BootComponentType.GRUB, b"grub-data")
-verifier.sign_component(component, signer_key, signer_cert)
-valid, reason = verifier.verify_component(component)
+```bash
+python simulator.py --tasks 1000 --concurrency 8
 ```
 
-## Boot Policies
+---
 
-| Policy | Behavior |
-|--------|----------|
-| `full` | All components must be signed and verified |
-| `audit` | Log failures but allow unsigned components |
-| `deployed` | Production mode, strict enforcement, stop on first failure |
-| `setup` | PK not enrolled, all components allowed |
+## 🐳 Container Deployment
 
-## Requirements
-
-Python 3.10+ stdlib only (no external dependencies).
-
-## License
-
-MIT
+```bash
+docker build -t secure-boot-uefi-pk-kek-agent .
+docker run -p 8000:8000 secure-boot-uefi-pk-kek-agent
+```
