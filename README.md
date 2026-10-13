@@ -68,7 +68,7 @@ docker build -t secure-boot-simulator .
 docker run --rm -p 127.0.0.1:8000:8000 secure-boot-simulator
 ```
 
-For persistent, authenticated audit logs, supply an `AUDIT_SECRET_KEY` through a secret manager; otherwise the service generates a fresh random in-memory audit key on startup. The API has no authentication and should not be exposed to an untrusted network.
+For a consistent audit HMAC key across restarts, supply an `AUDIT_SECRET_KEY` through a secret manager; otherwise the service generates a fresh random key on startup. Audit logs remain in memory and are **not** persisted across restarts. The API has no authentication and should not be exposed to an untrusted network.
 
 ## Technical notes
 
