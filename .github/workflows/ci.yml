@@ -36,6 +36,8 @@ jobs:
           python cli.py demo
           python cli.py chain --policy full
           python -m secure_boot_uefi.cli audit --primary 10 --secondary 4 --status NOMINAL
+      - name: Check browser JavaScript syntax
+        run: node --check web/app.js
       - name: Validate browser source bundle
         run: |
           python - <<'PY'
