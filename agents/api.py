@@ -11,8 +11,8 @@ from .supervisor import SystemSupervisor
 supervisor = SystemSupervisor(model_provider="mock")
 
 app = FastAPI(
-    title="Secure Boot Uefi Pk Kek Agent API",
-    description="Enterprise Distributed Component Platform (Post-Quantum Cryptography & Hardware Security)",
+    title="Generic Numeric Task Demonstration API",
+    description="Legacy numeric threshold demonstration; does not verify UEFI signatures or firmware",
     version="3.0.0-ENTERPRISE",
 )
 
@@ -23,7 +23,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "HEALTHY", "service": "secure-boot-uefi-pk-kek-agent", "domain": "Post-Quantum Cryptography & Hardware Security", "standard": "NIST FIPS 203/204/205 / ISO/IEC 17825 Standards", "version": "3.0.0-ENTERPRISE"}
+    return {"status": "HEALTHY", "service": "secure-boot-uefi-pk-kek-agent", "domain": "Generic numeric task demonstration", "standard": "None (demonstration only)", "version": "3.0.0-ENTERPRISE"}
 
 
 @app.get("/metrics")
