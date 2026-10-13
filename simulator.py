@@ -246,6 +246,9 @@ class SecureBootVerifier:
         self._pk_key: Optional[PrivateKey] = None
         self._kek_certs: Dict[str, Certificate] = {}
         self._kek_keys: Dict[str, PrivateKey] = {}
+        # Test-only HMAC keys for explicitly enrolled db certificates.
+        # Real UEFI verifies public-key signatures; this is not a firmware verifier.
+        self._db_signing_keys: Dict[str, PrivateKey] = {}
         self.db = SignatureDatabase("db")
         self.dbx = SignatureDatabase("dbx")
         self._verification_log: List[Dict[str, Any]] = []
@@ -281,19 +284,33 @@ class SecureBootVerifier:
 
         In a real system, the KEK must be signed by the PK.
         """
-        cert = key.get_certificate(subject, is_ca=True)
-
-        if signed_by_pk and self._pk_key:
-            # Sign the KEK certificate with PK
-            sig_data = cert.subject.encode() + cert.serial_number + cert.public_key_hash
-            # In simulation, we just store the cert; real system would verify PK signature
-
+        if not self._setup_mode and not signed_by_pk:
+            raise ValueError("Cannot enroll unsigned KEK after PK enrollment")
+        if signed_by_pk and not self._pk_key:
+            raise ValueError("PK must be enrolled before an authorized KEK")
+        # Issuer association only; no real X.509 or authenticated UEFI updates.
+        cert = key.get_certificate(
+            subject,
+            issuer=self._pk.subject if signed_by_pk else subject,
+            is_ca=True,
+        )
         self._kek_certs[cert.cert_id] = cert
         self._kek_keys[cert.cert_id] = key
         return cert
 
-    def enroll_db_cert(self, cert: Certificate) -> str:
-        """Add a certificate to the signature database (db)."""
+    def enroll_db_cert(self, cert: Certificate,
+                       signing_key: Optional[PrivateKey] = None) -> str:
+        """Allowlist a simulated signer, optionally registering its HMAC test key.
+
+        An enrolled certificate without a matching simulation key cannot
+        authenticate a signature. No real private keys should be used here.
+        """
+        if signing_key is not None:
+            if hashlib.sha256(signing_key.secret).digest() != cert.public_key_hash:
+                raise ValueError("Signing key does not match enrolled certificate")
+            if signing_key.algorithm != SignatureType.HMAC_SHA256:
+                raise ValueError("Only HMAC_SHA256 is implemented in this simulation")
+            self._db_signing_keys[cert.cert_id] = signing_key
         return self.db.add_certificate(cert)
 
     def enroll_dbx_hash(self, hash_value: bytes, description: str = "") -> None:
@@ -306,6 +323,15 @@ class SecureBootVerifier:
                        signing_key: PrivateKey,
                        signer_cert: Certificate) -> BootComponent:
         """Sign a boot component."""
+        if signing_key.algorithm != SignatureType.HMAC_SHA256:
+            raise ValueError("Only HMAC_SHA256 is implemented in this simulation")
+        enrolled_cert = self.db.get_certificate(signer_cert.cert_id)
+        if (enrolled_cert is not None
+                and enrolled_cert.public_key_hash == hashlib.sha256(signing_key.secret).digest()
+                and enrolled_cert.public_key_hash == signer_cert.public_key_hash):
+            # Backward-compatible test fixture registration for local signing.
+            # A mismatched or unenrolled key is never made trusted.
+            self._db_signing_keys[signer_cert.cert_id] = signing_key
         sig_value = signing_key.sign(component.data)
         component.signature = Signature(
             signature_type=SignatureType.HMAC_SHA256,
@@ -332,8 +358,17 @@ class SecureBootVerifier:
             'timestamp': timestamp,
         })
 
+        # Always hash the current bytes. A cached digest is not an authority.
+        current_hash = hashlib.sha256(component.data).digest()
+        if component.hash_value != current_hash:
+            reason = f"REJECTED: {component.name} content hash mismatch"
+            component.verified = False
+            component.verification_error = reason
+            self._log_result(component, False, reason)
+            return False, reason
+
         # Step 1: Check dbx (forbidden hashes)
-        if self.dbx.contains_hash(component.hash_value):
+        if self.dbx.contains_hash(current_hash):
             reason = f"REJECTED: {component.name} hash found in dbx (forbidden)"
             component.verified = False
             component.verification_error = reason
@@ -344,6 +379,7 @@ class SecureBootVerifier:
         if self._setup_mode:
             reason = f"ALLOWED: {component.name} - setup mode (no PK enrolled)"
             component.verified = True
+            component.verification_error = ""
             self._log_result(component, True, reason)
             return True, reason
 
@@ -352,6 +388,7 @@ class SecureBootVerifier:
             if self.policy == BootPolicy.AUDIT:
                 reason = f"AUDIT: {component.name} has no signature (audit mode)"
                 component.verified = True
+                component.verification_error = ""
                 self._log_result(component, True, reason)
                 return True, reason
             reason = f"REJECTED: {component.name} has no signature"
@@ -364,6 +401,13 @@ class SecureBootVerifier:
         sig = component.signature
         if not self.db.contains_certificate(sig.signer_cert_id):
             reason = f"REJECTED: {component.name} signer cert {sig.signer_cert_id} not in db"
+            component.verified = False
+            component.verification_error = reason
+            self._log_result(component, False, reason)
+            return False, reason
+
+        if self.dbx.contains_certificate(sig.signer_cert_id):
+            reason = f"REJECTED: {component.name} signer certificate revoked in dbx"
             component.verified = False
             component.verification_error = reason
             self._log_result(component, False, reason)
@@ -388,7 +432,7 @@ class SecureBootVerifier:
             return False, reason
 
         # Step 7: Verify certificate chain (signer -> KEK -> PK)
-        chain_valid, chain_reason = self._verify_certificate_chain(signer_cert)
+        chain_valid, chain_reason = self._verify_certificate_chain(signer_cert, timestamp)
         if not chain_valid:
             reason = f"REJECTED: {component.name} cert chain: {chain_reason}"
             component.verified = False
@@ -398,56 +442,35 @@ class SecureBootVerifier:
 
         reason = f"ACCEPTED: {component.name} verified successfully"
         component.verified = True
+        component.verification_error = ""
         self._log_result(component, True, reason)
         return True, reason
 
     def _verify_signature_value(self, component: BootComponent,
                                 sig: Signature, cert: Certificate) -> bool:
+        """Check an enrolled simulated HMAC signer and its signed content."""
+        if sig.signature_type != SignatureType.HMAC_SHA256 or len(sig.value) != 32:
+            return False
+        key = self._db_signing_keys.get(cert.cert_id)
+        if key is None or key.algorithm != SignatureType.HMAC_SHA256:
+            return False
+        if hashlib.sha256(key.secret).digest() != cert.public_key_hash:
+            return False
+        return hmac.compare_digest(key.sign(component.data), sig.value)
+
+    def _verify_certificate_chain(self, cert: Certificate, timestamp: float) -> Tuple[bool, str]:
+        """Model db enrollment authority, not cryptographic X.509 chains.
+
+        KEK authorizes db updates in UEFI; it is not a certificate-chain
+        issuer for executable image validation.
         """
-        Verify the cryptographic signature value.
-
-        In simulation, we check that the signature matches using the
-        corresponding private key's HMAC.  In a real system, this would
-        use RSA/ECDSA public key verification.
-        """
-        # For simulation: find the matching private key and verify
-        # In a real system, we'd use the public key from the cert
-        # Here we check if the signature was made by a known key
-        for kek_key in self._kek_keys.values():
-            expected = kek_key.sign(component.data)
-            if hmac.compare_digest(expected, sig.value):
-                return True
-        # Check db keys (if we stored them)
-        # For simulation, we accept if the signature is non-empty
-        return len(sig.value) > 0
-
-    def _verify_certificate_chain(self, cert: Certificate) -> Tuple[bool, str]:
-        """
-        Verify the certificate chain: cert → KEK → PK.
-
-        In a real system, this verifies cryptographic signatures at each level.
-        """
-        # Check if cert is directly trusted (self-signed by PK)
-        if cert.cert_id == self._pk.cert_id if self._pk else False:
-            return True, "Direct PK trust"
-
-        # Check if cert was signed by a KEK
-        for kek_cert in self._kek_certs.values():
-            if cert.issuer == kek_cert.subject or cert.issuer == kek_cert.cert_id:
-                # Verify KEK is signed by PK
-                if self._pk and kek_cert.issuer == self._pk.subject:
-                    return True, "Chain: cert → KEK → PK"
-                return True, "Chain: cert → KEK"
-
-        # Check if cert is the PK itself
-        if self._pk and cert.cert_id == self._pk.cert_id:
-            return True, "Direct PK"
-
-        # In simulation mode, accept if we have a valid PK and the cert is in db
-        if self._pk and self.db.contains_certificate(cert.cert_id):
-            return True, "Trusted via db enrollment"
-
-        return False, "No valid chain to PK"
+        if not self._pk or not self.db.contains_certificate(cert.cert_id):
+            return False, "No PK or db enrollment"
+        if not any(kek.issuer == self._pk.subject
+                   and kek.is_valid_at(timestamp)
+                   for kek in self._kek_certs.values()):
+            return False, "No authorized KEK enrolled"
+        return True, "Simulated db trust with PK/KEK enrolled"
 
     def _log_result(self, component: BootComponent, valid: bool, reason: str):
         """Log verification result."""

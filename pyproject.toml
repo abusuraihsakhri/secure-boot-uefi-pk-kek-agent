@@ -19,9 +19,18 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = []
 
+[project.optional-dependencies]
+api = ["fastapi>=0.110,<1", "uvicorn>=0.27,<1", "pydantic>=2,<3"]
+test = ["pytest>=8,<10", "fastapi>=0.110,<1", "uvicorn>=0.27,<1", "pydantic>=2,<3", "httpx>=0.27,<1"]
+
 [project.scripts]
 secure-boot-uefi-pk-kek-engine = "secure_boot_uefi.cli:main"
+secure-boot-sim = "cli:main"
+
+[tool.setuptools]
+packages = ["agents", "secure_boot_uefi"]
+py-modules = ["cli", "simulator", "enrichment", "secure_boot_uefi_app"]
 
 [project.urls]
-Homepage = "https://github.com/abusuraihsakhri/secure-boot-uefi-pk-kek-engine"
-Repository = "https://github.com/abusuraihsakhri/secure-boot-uefi-pk-kek-engine.git"
+Homepage = "https://github.com/abusuraihsakhri/secure-boot-uefi-pk-kek-agent"
+Repository = "https://github.com/abusuraihsakhri/secure-boot-uefi-pk-kek-agent.git"

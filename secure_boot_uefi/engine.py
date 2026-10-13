@@ -18,7 +18,7 @@ class FrontierDomainEngine:
         if value > cls.PRIMARY_BOUND:
             return {
                 "summary": "Primary Domain Boundary Deviation",
-                "details": f"Parameter value ({value:.3f}) exceeds operational threshold ({cls.PRIMARY_BOUND:.1f}) under UEFI Specification v2.10 (Secure Boot).",
+                "details": f"Parameter value ({value:.3f}) exceeds operational threshold ({cls.PRIMARY_BOUND:.1f}) under the configured demonstration threshold (not a UEFI conformance check).",
                 "remediation": "Engage parameter recalibration and algorithmic verification routine.",
             }
         return None
@@ -39,7 +39,7 @@ class FrontierDomainEngine:
         if any(flag in desc_upper for flag in ["VIOLATION", "DISCORDANT", "ANOMALY", "MUTANT", "LEAK"]):
             return {
                 "summary": "Specification / Protocol Anomaly Identified",
-                "details": f"Telemetry status flag '{descriptor}' violates UEFI Specification v2.10 (Secure Boot) conformance matrix.",
+                "details": f"Telemetry status flag '{descriptor}' matches a demonstration anomaly keyword; this does not establish a UEFI specification violation.",
                 "remediation": "Execute automated rollback or secondary consensus verification.",
             }
         return None

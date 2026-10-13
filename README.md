@@ -1,97 +1,82 @@
-# Secure Boot Uefi Pk Kek Agent
+# UEFI Secure Boot PK / KEK Simulator
 
-> **Domain:** Post-Quantum Cryptography & Zero-Knowledge Architecture  
-> **Reference Guidelines & Standards:** `NIST FIPS 203/204/205, NIST SP 800-90B & ISO/IEC Standards`
+An **educational Python simulation** of UEFI Secure Boot concepts: platform key (PK), key-exchange keys (KEK), allowed image signers (db), and revoked hashes / certificates (dbx). It models a three-component boot chain (shim → GRUB → kernel) with simplified HMAC-SHA256 test signatures.
 
-<div align="center">
+**Scope and limitations:** This repository does not parse real UEFI authenticated variables, validate X.509 chains, verify PE/COFF Authenticode, inspect your firmware, or perform secure enrollment. Simulation output must not be used as a security audit or compliance attestation.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+## Features
 
-</div>
+- Enroll toy PK, KEK, and db entries and simulate revocation using dbx.
+- Check a signed chain under full, deployed, audit, or setup policies.
+- Exercise unsigned, forged, untrusted, modified and revoked image scenarios.
+- Run the same Python simulation directly in the browser through Pyodide (WebAssembly).
+- Use the stdlib CLI and optional FastAPI service; a separate legacy numeric task evaluator is retained for compatibility.
+- Run regression tests covering signature enforcement, content hashing and audit-log tampering.
 
----
+## Use the browser simulator
 
-## 📖 What It Does
+The static application is in `web/` and is deployed by `.github/workflows/pages.yml`. It runs Python locally in the tab after loading the Pyodide runtime from jsDelivr. No firmware access, uploads, account, or backend is required. An internet connection is needed for the runtime on first load.
 
-UEFI Secure Boot Verification Simulator
-
----
-
-## ⚙️ Key Capabilities & Algorithmic Modules
-
-- **Deterministic Calculation Engine**: Strict compliance with standard reference formulations and thresholds.
-- **Risk & Urgency Classification**: Multi-tier categorization with automated clinical/operational action recommendations.
-- **Validation & Guardrails**: Rigorous input bounds checking and anomaly detection.
-
----
-
-## 💻 CLI Quickstart & Usage
-
-### 1. Guided Interactive Mode
-```bash
-python cli.py
-```
-
-### 2. Direct Parameterized Evaluation
-```bash
-python cli.py --policy <value> --revoke-hash <value> --name <value> --data <value>
-```
-
-### Parameter Reference
-- `--policy`: Specifies input measurement or parameter value.
-- `--revoke-hash`: Specifies input measurement or parameter value.
-- `--name`: Specifies input measurement or parameter value.
-- `--data`: Specifies input measurement or parameter value.
-- `--unsigned`: Specifies input measurement or parameter value.
-- `--revoke-kernel`: Specifies input measurement or parameter value.
-
-### Input Data Schema
-
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `task_id` | Parameter / observation metric | Required |
-| `target_identifier` | Parameter / observation metric | Required |
-| `primary_metric` | Parameter / observation metric | Required |
-| `secondary_metric` | Parameter / observation metric | Required |
-| `is_critical_flag` | Parameter / observation metric | Required |
-| `status_descriptor` | Parameter / observation metric | Required |
-
----
-
-## 🛡️ Security & Enterprise Architecture
-
-* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
-
----
-
-## 🧪 Testing & Verification
-
-Run the automated test suite:
+To run locally, serve a directory containing `index.html`, `style.css`, `app.js`, `browser_bridge.py` and `simulator.py`. For example:
 
 ```bash
-pytest -v
+mkdir -p /tmp/secure-boot-demo
+cp web/index.html web/style.css web/app.js web/browser_bridge.py simulator.py /tmp/secure-boot-demo/
+cd /tmp/secure-boot-demo
+python -m http.server 8000
 ```
 
-Execute high-throughput batch simulation benchmarks:
+Open `http://localhost:8000`. Do not open `index.html` directly via `file://`, because the browser must fetch the Python sources.
+
+## Python CLI
+
+Python 3.10+ (standard library only for the simulator):
 
 ```bash
-python simulator.py --tasks 1000 --concurrency 8
+python cli.py demo
+python cli.py verify --name test.efi --data example
+python cli.py verify --unsigned
+python cli.py chain --policy full
+python cli.py chain --policy audit --revoke-kernel
+python cli.py setup --policy full
+python cli.py status
 ```
 
----
+Each command creates an isolated simulated environment and does not read or modify system keys. The `setup` command prints a new toy environment; it does not persist state between invocations.
 
-## 🐳 Container Deployment
+## Install, tests and API
 
 ```bash
-docker build -t secure-boot-uefi-pk-kek-agent .
-docker run -p 8000:8000 secure-boot-uefi-pk-kek-agent
+python -m pip install -e ".[test]"
+python -m pytest -q
+python -m pip check
 ```
+
+Optional API mode:
+
+```bash
+python -m pip install -e ".[api]"
+uvicorn agents.api:app --host 127.0.0.1 --port 8000
+```
+
+`/health`, `/metrics`, `/api/audit`, `/api/chat` and `/api/audit/logs` belong to the **legacy generic task-evaluation service**, not to the toy boot-chain verifier. The `secure_boot_uefi` package similarly exposes the legacy numeric threshold engine. Neither should be mistaken for real Secure Boot inspection.
+
+To run the API using Docker:
+
+```bash
+docker build -t secure-boot-simulator .
+docker run --rm -p 127.0.0.1:8000:8000 secure-boot-simulator
+```
+
+For a consistent audit HMAC key across restarts, supply an `AUDIT_SECRET_KEY` through a secret manager; otherwise the service generates a fresh random key on startup. Audit logs remain in memory and are **not** persisted across restarts. The API has no authentication and should not be exposed to an untrusted network.
+
+## Technical notes
+
+- The HMAC simulator uses temporary, randomly generated keys, not actual asymmetric signatures.
+- db signing trust is modeled by enrollment. A KEK is used to represent update authority, **not** an image-signing certificate issuer. It does not cryptographically authenticate actual UEFI variable updates.
+- Browser evaluation is local; an external CDN provides Pyodide runtime assets.
+- The browser application is static and compatible with modern browsers that support WebAssembly and JavaScript.
+- Optional API dependencies: FastAPI, Uvicorn, Pydantic. Tests use pytest.
+- Source code and supporting assets are distributed under the [MIT License](LICENSE).
+
+Repository: https://github.com/abusuraihsakhri/secure-boot-uefi-pk-kek-agent

@@ -57,7 +57,7 @@ class PHIGuard:
 class AuditTrail:
     """Cryptographic Tamper-Evident HMAC-SHA256 Audit Trail."""
     def __init__(self, secret_key: Optional[str] = None):
-        self.secret_key = (secret_key or os.getenv("AUDIT_SECRET_KEY", "secure-boot-uefi-pk-kek-agent-master-audit-key-2026")).encode("utf-8")
+        self.secret_key = (secret_key or os.getenv("AUDIT_SECRET_KEY") or "").encode("utf-8") or os.urandom(32)
         self.logs: List[Dict[str, Any]] = []
 
     def log(self, actor: str, actor_tier: str, event_type: str, details: Dict[str, Any]) -> Dict[str, Any]:
@@ -83,14 +83,26 @@ class AuditTrail:
         return entry
 
     def verify_integrity(self) -> bool:
-        for i, entry in enumerate(self.logs):
-            prev = self.logs[i-1]["current_hash"] if i > 0 else "GENESIS_BLOCK_0000000000000000"
-            if entry["prev_hash"] != prev:
+        prev = "GENESIS_BLOCK_0000000000000000"
+        for entry in self.logs:
+            try:
+                if entry["prev_hash"] != prev:
+                    return False
+                payload = (
+                    f'{entry["audit_id"]}|{entry["timestamp"]}|{entry["actor"]}|'
+                    f'{entry["actor_tier"]}|{entry["event_type"]}|'
+                    f'{entry["payload_hash"]}|{prev}'
+                )
+                expected = hmac.new(self.secret_key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+                if not hmac.compare_digest(expected, entry["current_hash"]):
+                    return False
+                prev = entry["current_hash"]
+            except (KeyError, TypeError, ValueError):
                 return False
         return True
 
     def get_trail(self) -> List[Dict[str, Any]]:
-        return self.logs
+        return [dict(entry) for entry in self.logs]
 
 
 GLOBAL_AUDIT = AuditTrail()

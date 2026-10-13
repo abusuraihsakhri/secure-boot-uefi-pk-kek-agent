@@ -86,7 +86,7 @@ def cmd_verify(args):
 
 def cmd_chain(args):
     """Verify an entire boot chain."""
-    verifier = SecureBootVerifier(BootPolicy.FULL)
+    verifier = SecureBootVerifier(BootPolicy(args.policy))
     pk_key = PrivateKey("PK")
     verifier.enroll_pk(pk_key)
     kek_key = PrivateKey("KEK")

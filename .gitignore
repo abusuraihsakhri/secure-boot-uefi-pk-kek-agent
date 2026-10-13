@@ -8,3 +8,13 @@ output.csv
 dist/
 build/
 *.egg-info/
+
+# Local credentials and environments
+.env
+.env.*
+!.env.example
+.venv/
+*.pem
+*.key
+*.p12
+*.pfx
