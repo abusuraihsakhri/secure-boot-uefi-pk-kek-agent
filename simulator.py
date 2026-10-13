@@ -432,7 +432,7 @@ class SecureBootVerifier:
             return False, reason
 
         # Step 7: Verify certificate chain (signer -> KEK -> PK)
-        chain_valid, chain_reason = self._verify_certificate_chain(signer_cert)
+        chain_valid, chain_reason = self._verify_certificate_chain(signer_cert, timestamp)
         if not chain_valid:
             reason = f"REJECTED: {component.name} cert chain: {chain_reason}"
             component.verified = False
@@ -458,7 +458,7 @@ class SecureBootVerifier:
             return False
         return hmac.compare_digest(key.sign(component.data), sig.value)
 
-    def _verify_certificate_chain(self, cert: Certificate) -> Tuple[bool, str]:
+    def _verify_certificate_chain(self, cert: Certificate, timestamp: float) -> Tuple[bool, str]:
         """Model db enrollment authority, not cryptographic X.509 chains.
 
         KEK authorizes db updates in UEFI; it is not a certificate-chain
@@ -467,7 +467,7 @@ class SecureBootVerifier:
         if not self._pk or not self.db.contains_certificate(cert.cert_id):
             return False, "No PK or db enrollment"
         if not any(kek.issuer == self._pk.subject
-                   and kek.is_valid_at(time.time())
+                   and kek.is_valid_at(timestamp)
                    for kek in self._kek_certs.values()):
             return False, "No authorized KEK enrolled"
         return True, "Simulated db trust with PK/KEK enrolled"
