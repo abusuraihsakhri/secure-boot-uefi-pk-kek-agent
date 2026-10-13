@@ -23,7 +23,7 @@ async function initPython() {
   const sources = await Promise.all([readSource("simulator.py"), readSource("browser_bridge.py")]);
   py.FS.writeFile("/home/pyodide/simulator.py", sources[0]);
   py.FS.writeFile("/home/pyodide/browser_bridge.py", sources[1]);
-  await py.runPythonAsync("import sys\nsys.path.insert(0, '/home/pyodide')\nfrom browser_bridge import evaluate");
+  await py.runPythonAsync("import sys\nimport importlib\nimportlib.invalidate_caches()\nsys.path.insert(0, '/home/pyodide')\nfrom browser_bridge import evaluate");
   runtime.textContent = "Python simulator ready. All evaluations execute in this tab.";
   return py;
 }
