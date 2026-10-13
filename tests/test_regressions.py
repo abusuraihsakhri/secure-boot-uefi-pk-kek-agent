@@ -133,3 +133,18 @@ def test_chain_cli_honors_requested_policy(capsys):
 def test_packaged_entry_points_importable():
     from secure_boot_uefi.cli import main
     assert callable(main)
+
+
+def test_rejects_nonfinite_metrics_in_legacy_evaluator():
+    from secure_boot_uefi.models import FrontierPayload
+    with pytest.raises(ValueError):
+        FrontierPayload("task", "target", float("nan"), 1.0, "NOMINAL")
+    with pytest.raises(ValueError):
+        FrontierPayload("task", "target", 1.0, float("inf"), "NOMINAL")
+
+
+def test_rejects_nonfinite_metrics_in_pydantic_api():
+    from pydantic import ValidationError
+    from agents.models import SystemTaskPayload
+    with pytest.raises(ValidationError):
+        SystemTaskPayload(task_id="t", target_identifier="id", primary_metric=float("nan"))
