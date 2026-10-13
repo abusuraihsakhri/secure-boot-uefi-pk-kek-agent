@@ -4,6 +4,7 @@ Domain: Firmware Security
 Standard: UEFI Specification v2.10 (Secure Boot)
 """
 import datetime
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Any
@@ -25,6 +26,12 @@ class FrontierPayload:
     is_critical_flag: bool = False
     attributes: Dict[str, Any] = field(default_factory=dict)
     timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+
+    def __post_init__(self):
+        for field_name in ("primary_metric", "secondary_metric"):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not math.isfinite(float(value)):
+                raise ValueError(f"{field_name} must be a finite number")
 
 
 @dataclass
