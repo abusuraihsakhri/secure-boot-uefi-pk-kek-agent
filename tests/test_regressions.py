@@ -148,3 +148,21 @@ def test_rejects_nonfinite_metrics_in_pydantic_api():
     from agents.models import SystemTaskPayload
     with pytest.raises(ValidationError):
         SystemTaskPayload(task_id="t", target_identifier="id", primary_metric=float("nan"))
+
+
+def test_csv_boolean_parser_avoids_truthy_false_strings():
+    from secure_boot_uefi.cli import _parse_bool
+    assert _parse_bool("False") is False
+    assert _parse_bool("TRUE") is True
+    assert _parse_bool("0") is False
+    with pytest.raises(ValueError):
+        _parse_bool("maybe")
+
+
+def test_kek_expiry_uses_verification_timestamp():
+    verifier, _, _, component = configured()
+    kek = next(iter(verifier._kek_certs.values()))
+    when = time.time()
+    kek.not_after = when - 30
+    assert verifier.verify_component(component, timestamp=when - 60)[0] is True
+    assert verifier.verify_component(component, timestamp=when)[0] is False
