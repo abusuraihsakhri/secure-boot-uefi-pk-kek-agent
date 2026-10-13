@@ -11,7 +11,7 @@ coordinator = SecureBootCoordinator()
 def create_app():
     try:
         from fastapi import FastAPI
-        from pydantic import BaseModel
+        from pydantic import BaseModel, Field
 
         app = FastAPI(
             title="UEFI Secure Boot Platform Key (PK) & DBX Blacklist Auditor",
@@ -26,7 +26,7 @@ def create_app():
             secondary_metric: float = 14.2
             status_descriptor: str = "DISCORDANT_ANOMALY"
             is_critical_flag: bool = True
-            attributes: Dict[str, Any] = {}
+            attributes: Dict[str, Any] = Field(default_factory=dict)
 
         class ChatRequest(BaseModel):
             query: str
