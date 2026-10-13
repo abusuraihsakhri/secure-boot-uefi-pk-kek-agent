@@ -105,6 +105,6 @@ class SecureBootCoordinator:
         if "status" in q or "ledger" in q:
             return f"UEFI Secure Boot Platform Key (PK) & DBX Blacklist Auditor currently managing {len(self.execution_ledger)} execution tasks in air-gapped memory."
         elif "standard" in q or "spec" in q:
-            return "Active runtime operating strictly according to UEFI Specification v2.10 (Secure Boot) specifications."
+            return "UEFI Specification v2.10 (Secure Boot) is reference background only; this legacy numeric evaluator does not perform cryptographic or standards conformance verification."
         else:
-            return f"UEFI Secure Boot Platform Key (PK) & DBX Blacklist Auditor executive coordinator online. Zero-telemetry on-premises surveillance active."
+            return "Legacy numeric demonstration coordinator online. No device or firmware inspection is performed."
