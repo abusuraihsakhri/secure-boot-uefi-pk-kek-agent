@@ -163,6 +163,9 @@ def test_kek_expiry_uses_verification_timestamp():
     verifier, _, _, component = configured()
     kek = next(iter(verifier._kek_certs.values()))
     when = time.time()
+    kek.not_before = when - 120
     kek.not_after = when - 30
+    signer_cert = verifier.db.get_certificate(component.signature.signer_cert_id)
+    signer_cert.not_before = when - 120
     assert verifier.verify_component(component, timestamp=when - 60)[0] is True
     assert verifier.verify_component(component, timestamp=when)[0] is False
